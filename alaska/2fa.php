@@ -1,0 +1,25 @@
+<?php
+require_once 'includes/header.php';
+require_once 'includes/2fa.php';
+redirigirSiNoAutenticado();
+$mensaje='';$tipo_mensaje='';$mostrar_setup=false;$secret='';
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['activar_2fa'])){ $secret=generarSecreto2FA(); $qr_url=generarQRCodeURL($secret,$usuario['nombre'],$usuario['email']??''); $mostrar_setup=true; }
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['verificar_codigo'])){ $codigo=$_POST['codigo']??''; $secret=$_POST['secret']??''; if(verificarCodigo2FA($secret,$codigo)){ if(activar2FA($pdo,$usuario['id'],$secret)){ $mensaje='2FA activado'; $tipo_mensaje='success'; } else { $mensaje='Error al activar'; $tipo_mensaje='error'; } } else { $mensaje='Código incorrecto'; $tipo_mensaje='error'; $mostrar_setup=true; } }
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['desactivar_2fa'])){ if(desactivar2FA($pdo,$usuario['id'])){ $mensaje='2FA desactivado'; $tipo_mensaje='success'; } else { $mensaje='Error al desactivar'; $tipo_mensaje='error'; } }
+$estado_2fa=obtenerEstado2FA($pdo,$usuario['id']);
+?>
+<div class="container"><aside class="sidebar"><a href="index.php" class="sidebar-item"><i class="fas fa-home"></i><span>Inicio</span></a><a href="ajustes.php" class="sidebar-item"><i class="fas fa-cog"></i><span>Ajustes</span></a><a href="2fa.php" class="sidebar-item active"><i class="fas fa-shield-alt"></i><span>Seguridad</span></a></aside><main class="main-content"><div class="seguridad-container"><h2 style="color:var(--verde-principal);margin-bottom:1.5rem;"><i class="fas fa-shield-alt"></i> Autenticación de Dos Factores</h2><?php if($mensaje): ?><div class="alert alert-<?= $tipo_mensaje ?>"><?= htmlspecialchars($mensaje) ?></div><?php endif; ?>
+<?php if($mostrar_setup): ?>
+ <div class="setup-box"><h3>Configurar 2FA</h3><p>Escanea este código con tu app de autenticación:</p><div class="qr-code-container"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?= urlencode(generarQRCodeURL($secret,$usuario['nombre'],$usuario['email']??'')) ?>" alt="QR 2FA"></div><p style="text-align:center"><strong>Secreto:</strong> <code><?= chunk_split($secret,4,' ') ?></code></p><form method="POST" style="margin-top:1.5rem;"><input type="hidden" name="secret" value="<?= htmlspecialchars($secret) ?>"><div class="form-group"><label>Código</label><input type="text" name="codigo" class="form-control" required maxlength="6" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div><div style="display:flex;gap:1rem;margin-top:1.5rem;"><button type="submit" name="verificar_codigo" class="btn btn-primary">Verificar y Activar</button><a href="2fa.php" class="btn btn-secondary">Cancelar</a></div></form></div>
+<?php else: ?>
+ <div class="estado-2fa <?= ($estado_2fa && $estado_2fa['activo'])? 'activo':'inactivo' ?>"><div class="icono"><i class="fas <?= ($estado_2fa && $estado_2fa['activo'])? 'fa-lock':'fa-lock-open' ?>"></i></div><div><h3><?= ($estado_2fa && $estado_2fa['activo'])? 'Activado':'Desactivado' ?></h3><p><?= ($estado_2fa && $estado_2fa['activo'])? 'Tu cuenta está protegida con 2FA':'Activa 2FA para mayor seguridad' ?></p></div></div>
+ <?php if($estado_2fa && $estado_2fa['activo']): ?>
+  <form method="POST" onsubmit="return confirm('¿Desactivar 2FA?');"><button type="submit" name="desactivar_2fa" class="btn btn-secondary"><i class="fas fa-lock-open"></i> Desactivar 2FA</button></form>
+ <?php else: ?>
+  <form method="POST"><button type="submit" name="activar_2fa" class="btn btn-primary"><i class="fas fa-lock"></i> Activar 2FA</button></form>
+ <?php endif; ?>
+ <div class="info-2fa"><h4>¿Qué es 2FA?</h4><p>Agrega una capa adicional de seguridad: además de tu contraseña, necesitarás un código temporal generado en tu dispositivo.</p><h4>Apps recomendadas:</h4><ul><li>Google Authenticator</li><li>Authy</li><li>Microsoft Authenticator</li></ul></div>
+<?php endif; ?>
+</div></main></div>
+<style>.seguridad-container{background:#fff;border-radius:var(--borde-radius);padding:2rem;box-shadow:var(--sombra);} .estado-2fa{display:flex;align-items:center;gap:1rem;padding:1.2rem;border-radius:var(--borde-radius);margin-bottom:2rem;border:2px solid var(--gris-medio);} .estado-2fa.activo{border-color:var(--verde-principal);background:rgba(46,204,113,.1);} .estado-2fa.inactivo{border-color:var(--naranja-principal);background:rgba(231,76,60,.1);} .estado-2fa .icono{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.05);font-size:1.3rem;} .setup-box{background:var(--gris-claro);padding:2rem;border-radius:var(--borde-radius);} .qr-code-container{display:inline-block;padding:1rem;background:#fff;border-radius:8px;margin:1rem 0;} .info-2fa{margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--gris-medio);} </style>
+</body></html>
